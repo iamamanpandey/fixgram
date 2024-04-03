@@ -1,53 +1,42 @@
 import streamlit as st
-from audio_recorder_streamlit import audio_recorder
 import whisper
-import soundfile as sf
-import numpy as np
 from langchain.prompts import PromptTemplate
 from langchain.llms import CTransformers
-import io
-import torch
-import fleep
+from audiorecorder import audiorecorder
 
 
-def getLLamaresponse(input_text):
+@st.cache_resource
+def load_llama_model():
+    try:
+        llm = CTransformers(
+            model="models/llama-2-7b-chat.ggmlv3.q8_0.bin",
+            model_type="llama",
+            config={"max_new_tokens": 256, "temperature": 0.01},
+        )
+        return llm
+    except Exception as e:
+        return None, str(e)
 
-    ### LLama2 model
-    llm = CTransformers(
-        model="models/llama-2-7b-chat.ggmlv3.q8_0.bin",
-        model_type="llama",
-        config={"max_new_tokens": 256, "temperature": 0.01},
-    )
 
+@st.cache_resource
+def load_whisper_model():
+    try:
+        return whisper.load_model("base.en")
+    except Exception as e:
+        return None, str(e)
+
+
+def getLLammaResponse(input_text):
     ## Prompt Template
 
-    template = """ Please fix grammer for `{input_text}` """
+    template = """ Please fix grammar for `{input_text}` """
 
     prompt = PromptTemplate(input_variables=[""], template=template)
+    llm = load_llama_model()
 
-    ## Generate the ressponse from the LLama 2 model
+    ## Generate the response from the LLama 2 model
     response = llm(prompt.format(input_text=input_text))
     return response
-
-
-def recognize_audio(audio_data):
-    if audio_data:
-        with open(audio_data, "wb") as f:
-            f.write(audio_data)
-
-
-# try:
-
-
-# model = whisper.load_model("base")
-
-# Convert byte data to NumPy array
-
-# result = model.transcribe(audio_data)
-
-#     return  result["text"]
-# except Exception as e:
-#         return None, str(e)
 
 
 st.set_page_config(
@@ -57,17 +46,45 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.header(" FixGram  🤖")
+st.header("FixGram  🤖")
 
 input_text = st.text_input("Enter the Sentence")
 
-audio_bytes = audio_recorder()
-if audio_bytes:
-    with open(audio_bytes, "rb" ) as f:
-            f.write(audio_bytes)
+audio = audiorecorder("Click to record", "Click to stop recording")
+if len(audio) > 0:
+    st.audio(audio.export().read())
+    audio.export("audio.wav", format="wav")
 
-submit = st.button("Submit")
 
-## Final response
-# if submit:
-#     st.write(recognize_audio(audio_bytes))
+col1, col2 = st.columns(2)
+
+with col1:
+    submit = st.button("Submit")
+with col2:
+    transcribeAudio = st.button("Transcribe Audio")
+
+
+if transcribeAudio:
+    if audio is not None:
+        model = load_whisper_model()
+        result2 = model.transcribe("audio.wav")
+        st.write(result2["text"])
+    if len(result2["text"]) > 0:
+        st.markdown(getLLammaResponse(result2["text"]))
+
+
+# Final response
+if submit:
+    st.write(getLLammaResponse(input_text))
+
+
+# if st.button("Transcribe Audio"):
+#     if audio_file is not None:
+#         st.success("Audio file uploaded")
+#         result = model.transcribe(audio_file.name)
+#         st.success("Transcribe Successful")
+#         st.text(result["text"])
+#         st.text("Correct Answer:")
+#         st.markdown(getLLammaResponse(result["text"]))
+#     else:
+#         st.sidebar.error("No audio file uploaded")
