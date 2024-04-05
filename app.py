@@ -28,8 +28,8 @@ def load_whisper_model():
 
 def getLLammaResponse(input_text):
     ## Prompt Template
-
-    template = """ Please fix grammar for `{input_text}` """
+    template = """Please generate a corrected version of the provided text, ensuring proper grammar, punctuation, and sentence structure.
+      provided text is   `{input_text}` """
 
     prompt = PromptTemplate(input_variables=[""], template=template)
     llm = load_llama_model()
